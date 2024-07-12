@@ -2,6 +2,7 @@ from telethon import TelegramClient, events
 import time
 import re
 import random
+import asyncio
 
 # Замените эти значения на свои API ID, API хеш и номер телефона
 api_id = '20045757'
@@ -9,6 +10,9 @@ api_hash = '7d3ea0c0d4725498789bd51a9ee02421'
 phone = '+79954748369'
 
 client = TelegramClient('your_bot_session', api_id, api_hash)
+
+# Получите свой ID пользователя
+my_id = None
 
 @client.on(events.NewMessage(pattern=r".*report\s+(\d+).*"))
 async def handle_report(event):
@@ -46,10 +50,31 @@ async def handle_ping(event):
     ping = random.randint(14, 1000)
     await event.message.edit(f"Ваш телеграмм пинг: {ping} ms")
 
-with client:
-    client.connect()
-    if not client.is_user_authorized():
+@client.on(events.NewMessage(pattern=r".*spam\s+(\d+)\s+(.+)\s+(\d+)"))
+async def handle_spam(event):
+    global my_id
+    if event.sender_id == my_id:
+        match = re.search(r"spam\s+(\d+)\s+(.+)\s+(\d+)", event.message.text)
+        if match:
+            count = int(match.group(1))
+            text = match.group(2)
+            delay = float(match.group(3))
+
+            for _ in range(count):
+                await event.message.respond(text)
+                time.sleep(delay)
+    else:
+        await event.message.respond("Извини, ты не можешь использовать эту команду.")
+
+
+async def main():
+    global my_id  
+    await client.connect()
+    if not await client.is_user_authorized():
         client.send_code_request(phone)
         client.sign_in(phone, input('Enter the code: '))
-    
-    client.run_until_disconnected()
+    my_id = (await client.get_me()).id
+    await client.run_until_disconnected()
+
+if __name__ == '__main__':
+    asyncio.run(main()) 
